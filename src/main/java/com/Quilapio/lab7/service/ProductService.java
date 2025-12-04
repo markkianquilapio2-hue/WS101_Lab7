@@ -1,60 +1,89 @@
 package com.Quilapio.lab7.service;
 
+import com.Quilapio.lab7.model.Product;
 import org.springframework.stereotype.Service;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
-import com.Quilapio.lab7.model.Product;
 
+/**
+ * Service layer to handle business logic and data access for Product entities.
+ * This class uses an in-memory Map to simulate a database.
+ */
 @Service
 public class ProductService {
 
-    private final List<Product> inventory = new ArrayList<>();
-    private final AtomicLong nextId = new AtomicLong(4); // Start after mock products
+    // Simulates a database table using a concurrent hash map for thread safety
+    private final Map<Long, Product> productRepository = new ConcurrentHashMap<>();
 
+    // Used to generate unique IDs for new products
+    private final AtomicLong idGenerator = new AtomicLong(3);
+
+    // Initialize with some mock data
     public ProductService() {
-        // Initialize with at least three mock products
-        inventory.add(new Product(1L, "Laptop Pro", 1999.99));
-        inventory.add(new Product(2L, "Wireless Mouse", 25.00));
-        inventory.add(new Product(3L, "Monitor 4K", 450.50));
+        productRepository.put(1L, new Product(1L, "Laptop Pro X", 1299.99));
+        productRepository.put(2L, new Product(2L, "Wireless Mouse", 25.50));
+        productRepository.put(3L, new Product(3L, "Mechanical Keyboard", 89.99));
     }
 
-    // READ ALL Products
+    /**
+     * Retrieves all products.
+     * @return A list of all products.
+     */
     public List<Product> findAll() {
-        return inventory;
+        // Return a new ArrayList to prevent external modifications to the internal map
+        return new ArrayList<>(productRepository.values());
     }
 
-    // READ ONE Product
+    /**
+     * Retrieves a product by its ID.
+     * @param id The ID of the product.
+     * @return An Optional containing the product if found, or empty otherwise.
+     */
     public Optional<Product> findById(Long id) {
-        return inventory.stream()
-                .filter(p -> p.getId().equals(id))
-                .findFirst();
+        return Optional.ofNullable(productRepository.get(id));
     }
 
-    // CREATE a new Product
-    public Product create(Product product) {
-        product.setId(nextId.getAndIncrement());
-        inventory.add(product);
+    /**
+     * Creates a new product and assigns it a unique ID.
+     * @param product The product object to save.
+     * @return The saved product with the generated ID.
+     */
+    public Product save(Product product) {
+        // Assign a new ID only if the product ID is null
+        if (product.getId() == null || product.getId() == 0) {
+            product.setId(idGenerator.incrementAndGet());
+        }
+        productRepository.put(product.getId(), product);
         return product;
     }
 
-    // UPDATE an existing Product
+    /**
+     * Updates an existing product.
+     * @param id The ID of the product to update.
+     * @param updatedProduct The product data to update with.
+     * @return An Optional containing the updated product if the ID was found, or empty otherwise.
+     */
     public Optional<Product> update(Long id, Product updatedProduct) {
-        Optional<Product> existingProduct = findById(id);
-
-        if (existingProduct.isPresent()) {
-            Product product = existingProduct.get();
-            product.setName(updatedProduct.getName());
-            product.setPrice(updatedProduct.getPrice());
-            return Optional.of(product);
-        } else {
-            return Optional.empty();
+        if (productRepository.containsKey(id)) {
+            // Ensure the ID of the updated object matches the path ID
+            updatedProduct.setId(id);
+            productRepository.put(id, updatedProduct);
+            return Optional.of(updatedProduct);
         }
+        return Optional.empty();
     }
 
-    // DELETE a Product
-    public boolean delete(Long id) {
-        return inventory.removeIf(p -> p.getId().equals(id));
+    /**
+     * Deletes a product by its ID.
+     * @param id The ID of the product to delete.
+     * @return true if the product was successfully deleted, false otherwise.
+     */
+    public boolean deleteById(Long id) {
+        return productRepository.remove(id) != null;
     }
 }
